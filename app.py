@@ -3,12 +3,15 @@ import streamlit as st
 from deep_list import *
 import torch
 import os
+from pathlib import Path
+import sys
+
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
 def main():
     st.title("Dashboard")
-    st.markdown('In this application we are using **YoloV5** for detecting and classifying objects and **Deepsort** for tracking their movements. Click on Start tracking for the default RTSP Link and if you want you can provide a video link or upload a local one  ')
+    st.markdown('In this application we are using **YoloV5** for detecting and classifying objects and **Deepsort** for tracking their movements. Click on Start tracking for the default RTSP Link and if you want you can provide a video link or upload a local one. After clicking on the tracking button, wait for few seconds for the video to load...')
 
     inference_msg = st.empty()
     st.sidebar.title("Configuration")

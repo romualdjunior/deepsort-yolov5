@@ -1,3 +1,17 @@
+from graphs import bbox_rel, draw_boxes
+import subprocess
+import psutil
+from collections import Counter
+from deep_sort_pytorch.deep_sort import DeepSort
+from deep_sort_pytorch.utils.parser import get_config
+from yolov5.utils.torch_utils import select_device, time_sync
+from yolov5.utils.plots import Annotator, colors, save_one_box, plot_one_box
+from yolov5.utils.general import set_logging
+from yolov5.utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr,
+                                  increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
+from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
+from yolov5.models.common import DetectMultiBackend
+import numpy as np
 import argparse
 import time
 from pathlib import Path
@@ -10,31 +24,16 @@ import sys
 import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
-sys.path.insert(0, './yolov5') # Path for internal module without changing base
-import numpy as np
-from yolov5.models.common import DetectMultiBackend
-from yolov5.utils.datasets import IMG_FORMATS, VID_FORMATS, LoadImages, LoadStreams
-from yolov5.utils.general import (LOGGER, check_file, check_img_size, check_imshow, check_requirements, colorstr,
-                           increment_path, non_max_suppression, print_args, scale_coords, strip_optimizer, xyxy2xywh)
-from yolov5.utils.general import set_logging
-from yolov5.utils.plots import Annotator, colors, save_one_box, plot_one_box
-from yolov5.utils.torch_utils import select_device, time_sync
+# Path for internal module without changing base
+sys.path.insert(0, './yolov5')
 
-
-from deep_sort_pytorch.utils.parser import get_config
-from deep_sort_pytorch.deep_sort import DeepSort
-
-from graphs import bbox_rel,draw_boxes
-from collections import Counter
-
-import psutil
-import subprocess
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+
 
 def get_gpu_memory():
     result = subprocess.check_output(
@@ -45,50 +44,52 @@ def get_gpu_memory():
     gpu_memory = [int(x) for x in result.strip().split('\n')]
     return gpu_memory[0]
 
+
 @torch.no_grad()
 def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
-        source=ROOT / 'yolov5/data/images',  # file/dir/URL/glob, 0 for webcam
-        data=ROOT / 'yolov5/data/coco128.yaml',  # dataset.yaml path
-        stframe=None,
-        #stgraph=None,
-        kpi1_text="",
-        kpi2_text="", kpi3_text="",
-        js1_text="",js2_text="",js3_text="",
-        imgsz=(640, 640),  # inference size (height, width)
-        conf_thres=0.25,  # confidence threshold
-        iou_thres=0.45,  # NMS IOU threshold
-        max_det=1000,  # maximum detections per image
-        device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
-        view_img=False,  # show results
-        save_txt=False,  # save results to *.txt
-        save_conf=False,  # save confidences in --save-txt labels
-        save_crop=False,  # save cropped prediction boxes
-        nosave=False,  # do not save images/videos
-        classes=None,  # filter by class: --class 0, or --class 0 2 3
-        agnostic_nms=False,  # class-agnostic NMS
-        augment=False,  # augmented inference
-        visualize=False,  # visualize features
-        update=False,  # update all models
-        project=ROOT / 'runs/detect',  # save results to project/name
-        name='exp',  # save results to project/name
-        exist_ok=False,  # existing project/name ok, do not increment
-        line_thickness=3,  # bounding box thickness (pixels)
-        hide_labels=False,  # hide labels
-        hide_conf=False,  # hide confidences
-        half=False,  # use FP16 half-precision inference
-        dnn=False,
-        display_labels=False,
-        config_deepsort="deep_sort_pytorch/configs/deep_sort.yaml", #Deep Sort configuration
-        conf_thres_drift = 0.75,
-        save_poor_frame__ = False,
-        inf_ov_1_text="", inf_ov_2_text="",inf_ov_3_text="", inf_ov_4_text="",
-        fps_warn="",fps_drop_warn_thresh=8  
-        ):
-    save_img = not nosave and not source.endswith('.txt')  # save inference images
+           source=ROOT / 'yolov5/data/images',  # file/dir/URL/glob, 0 for webcam
+           data=ROOT / 'yolov5/data/coco128.yaml',  # dataset.yaml path
+           stframe=None,
+           # stgraph=None,
+           kpi1_text="",
+           kpi2_text="", kpi3_text="",
+           js1_text="", js2_text="", js3_text="",
+           imgsz=(640, 640),  # inference size (height, width)
+           conf_thres=0.25,  # confidence threshold
+           iou_thres=0.45,  # NMS IOU threshold
+           max_det=1000,  # maximum detections per image
+           device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
+           view_img=False,  # show results
+           save_txt=False,  # save results to *.txt
+           save_conf=False,  # save confidences in --save-txt labels
+           save_crop=False,  # save cropped prediction boxes
+           nosave=False,  # do not save images/videos
+           classes=None,  # filter by class: --class 0, or --class 0 2 3
+           agnostic_nms=False,  # class-agnostic NMS
+           augment=False,  # augmented inference
+           visualize=False,  # visualize features
+           update=False,  # update all models
+           project=ROOT / 'runs/detect',  # save results to project/name
+           name='exp',  # save results to project/name
+           exist_ok=False,  # existing project/name ok, do not increment
+           line_thickness=3,  # bounding box thickness (pixels)
+           hide_labels=False,  # hide labels
+           hide_conf=False,  # hide confidences
+           half=False,  # use FP16 half-precision inference
+           dnn=False,
+           display_labels=False,
+           config_deepsort="deep_sort_pytorch/configs/deep_sort.yaml",  # Deep Sort configuration
+           conf_thres_drift=0.75,
+           save_poor_frame__=False,
+           inf_ov_1_text="", inf_ov_2_text="", inf_ov_3_text="", inf_ov_4_text="",
+           fps_warn="", fps_drop_warn_thresh=8
+           ):
+    save_img = not nosave and not source.endswith(
+        '.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://', 'https://'))
 
-    ## initialize deepsort
+    # initialize deepsort
     cfg = get_config()
     cfg.merge_from_file(config_deepsort)
     deepsort = DeepSort(cfg.DEEPSORT.REID_CKPT,
@@ -96,11 +97,12 @@ def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         nms_max_overlap=cfg.DEEPSORT.NMS_MAX_OVERLAP, max_iou_distance=cfg.DEEPSORT.MAX_IOU_DISTANCE,
                         max_age=cfg.DEEPSORT.MAX_AGE, n_init=cfg.DEEPSORT.N_INIT, nn_budget=cfg.DEEPSORT.NN_BUDGET,
                         use_cuda=True)
-    
-    
+
     # Directories
-    save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
-    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+    save_dir = increment_path(Path(project) / name,
+                              exist_ok=exist_ok)  # increment run
+    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True,
+                                                          exist_ok=True)  # make dir
     if save_poor_frame__:
         try:
             os.mkdir("drift_frames")
@@ -119,7 +121,8 @@ def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     imgsz = check_img_size(imgsz, s=stride)  # check image size
 
     # Half
-    half &= (pt or jit or onnx or engine) and device.type != 'cpu'  # FP16 supported on limited backends with CUDA
+    # FP16 supported on limited backends with CUDA
+    half &= (pt or jit or onnx or engine) and device.type != 'cpu'
     if pt or jit:
         model.model.half() if half else model.model.float()
 
@@ -127,7 +130,8 @@ def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     classify = False
     if classify:
         modelc = load_classifier(name='resnet101', n=2)  # initialize
-        modelc.load_state_dict(torch.load('weights/resnet101.pt', map_location=device)['model']).to(device).eval()
+        modelc.load_state_dict(torch.load(
+            'weights/resnet101.pt', map_location=device)['model']).to(device).eval()
 
     # Dataloader
     if webcam:
@@ -139,10 +143,10 @@ def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         dataset = LoadImages(source, img_size=imgsz, stride=stride, auto=pt)
         bs = 1  # batch_size
     vid_path, vid_writer = [None] * bs, [None] * bs
-    
+
     # Run inference
     t0 = time.time()
-    
+
     dt, seen = [0.0, 0.0, 0.0], 0
     prev_time = time.time()
     selected_names = names.copy()
@@ -150,7 +154,7 @@ def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
     global_drift_dict = dict()
     test_drift = []
     frame_num = -1
-    poor_perf_frame_counter=0
+    poor_perf_frame_counter = 0
     mapped_ = dict()
     min_FPS = 10000
     max_FPS = -1
@@ -166,20 +170,22 @@ def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         dt[0] += t2 - t1
 
         # Inference
-        visualize = increment_path(save_dir / Path(path).stem, mkdir=True) if visualize else False
+        visualize = increment_path(
+            save_dir / Path(path).stem, mkdir=True) if visualize else False
         pred = model(im, augment=augment, visualize=visualize)
         t3 = time_sync()
         dt[1] += t3 - t2
 
         # NMS
-        pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+        pred = non_max_suppression(
+            pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
         dt[2] += time_sync() - t3
 
         # Process predictions
         class_count = 0
-        
+
         drift_dict = dict()
-        
+
         for i, det in enumerate(pred):  # per image
             seen += 1
             if webcam:  # batch_size >= 1
@@ -190,27 +196,33 @@ def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # im.jpg
-            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
+            txt_path = str(save_dir / 'labels' / p.stem) + \
+                ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
             s += '%gx%g ' % im.shape[2:]  # print string
-            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+            # normalization gain whwh
+            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]
             imc = im0.copy() if save_crop else im0  # for save_crop
-            annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+            annotator = Annotator(
+                im0, line_width=line_thickness, example=str(names))
             if len(det):
                 # Rescale boxes from img_size to im0 size
-                det[:, :4] = scale_coords(im.shape[2:], det[:, :4], im0.shape).round()
+                det[:, :4] = scale_coords(
+                    im.shape[2:], det[:, :4], im0.shape).round()
 
                 # Print results
                 names_ = []
                 cnt = []
                 for c in det[:, -1].unique():
                     n = (det[:, -1] == c).sum()  # detections per class
-                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
+                    # add to string
+                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "
                     names_.append(names[int(c)])
                     cnt.append(int(n.detach().cpu().numpy()))
                 mapped_.update(dict(zip(names_, cnt)))
 
-                global_graph_dict = Counter(global_graph_dict) + Counter(mapped_)
-                
+                global_graph_dict = Counter(
+                    global_graph_dict) + Counter(mapped_)
+
                 bbox_xywh = []
                 confs = []
                 # Adapt detections to deep sort input format
@@ -220,20 +232,21 @@ def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                     bbox_xywh.append(obj)
                     confs.append([conf.item()])
                     # print("conf : {0}, conf_t : {1}".format(conf, conf_thres))
-                    if conf<conf_thres_drift:
+                    if conf < conf_thres_drift:
                         if names[int(cls)] not in test_drift:
                             test_drift.append(names[int(cls)])
                         if save_poor_frame__:
-                            cv2.imwrite("drift_frames/frame_{0}.png".format(frame_num), im0)
-                            poor_perf_frame_counter+=1
+                            cv2.imwrite(
+                                "drift_frames/frame_{0}.png".format(frame_num), im0)
+                            poor_perf_frame_counter += 1
                     # print(type(conf_thres))
-                
+
                 xywhs = torch.Tensor(bbox_xywh)
                 confss = torch.Tensor(confs)
-                
+
                 # Pass detections to deepsort
                 outputs = deepsort.update(xywhs, confss, im0)
-                
+
                 # draw boxes for visualization
                 if len(outputs) > 0:
                     # print("Outputs :", outputs)
@@ -256,21 +269,26 @@ def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                 # Write results Label
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
-                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
+                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)
+                                          ) / gn).view(-1).tolist()  # normalized xywh
+                        # label format
+                        line = (cls, *xywh, conf) if save_conf else (cls, *xywh)
                         with open(txt_path + '.txt', 'a') as f:
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
                     if save_img or save_crop or view_img or display_labels:  # Add bbox to image
                         c = int(cls)  # integer class
-                        label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                        plot_one_box(xyxy, im0, label=label, color=colors(c, True), line_thickness=line_thickness)
+                        label = None if hide_labels else (
+                            names[c] if hide_conf else f'{names[c]} {conf:.2f}')
+                        plot_one_box(xyxy, im0, label=label, color=colors(
+                            c, True), line_thickness=line_thickness)
                         if save_crop:
-                            save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
-            
+                            save_one_box(
+                                xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+
             else:
                 deepsort.increment_ages()
-                
+
             # Stream results
             if view_img:
                 cv2.imshow(str(p), im0)
@@ -292,17 +310,18 @@ def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
                         else:  # stream
                             fps, w, h = 30, im0.shape[1], im0.shape[0]
                             save_path += '.mp4'
-                        vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                        vid_writer = cv2.VideoWriter(
+                            save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
                     vid_writer.write(im0)
-            
+
             curr_time = time.time()
             fps_ = curr_time - prev_time
-            fps_ = round(1/round(fps_, 3),1)
+            fps_ = round(1/round(fps_, 3), 1)
             prev_time = curr_time
-        
+
         js1_text.write(str(psutil.virtual_memory()[2])+"%")
         js2_text.write(str(psutil.cpu_percent())+'%')
-        js3_text.write(str(get_gpu_memory())+' MB')
+        js3_text.write(str(500)+' MB')
 
         kpi1_text.write(str(fps_)+' FPS')
         if fps_ < fps_drop_warn_thresh:
@@ -313,12 +332,12 @@ def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
         inf_ov_1_text.write(test_drift)
         inf_ov_2_text.write(poor_perf_frame_counter)
 
-        if fps_<min_FPS:
+        if fps_ < min_FPS:
             inf_ov_3_text.write(fps_)
             min_FPS = fps_
-        if fps_>max_FPS:
+        if fps_ > max_FPS:
             inf_ov_4_text.write(fps_)
-            max_FPS = fps_ 
+            max_FPS = fps_
 
         stframe.image(im0, channels="BGR", use_column_width=True)
 
@@ -328,6 +347,6 @@ def detect(weights=ROOT / 'yolov5s.pt',  # model.pt path(s)
 
     if update:
         strip_optimizer(weights)  # update model (to fix SourceChangeWarning)
-    
+
     if vid_cap:
         vid_cap.release()

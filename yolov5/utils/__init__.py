@@ -3,6 +3,25 @@
 utils/initialization
 """
 
+from pathlib import Path
+import os
+import sys
+
+# WINDOWS
+FILE = Path(__file__).resolve()
+ROOT = FILE.parents[0]  # YOLOv5 root directory
+if str(ROOT) not in sys.path:
+    sys.path.append(FILE.parents[0])  # add ROOT to PATH
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+print("ROOT", ROOT)
+print("FILE", FILE)
+print("PARENT", FILE.parents[0])
+
+# UBUNTU
+sys.path.append("/deepsort-yolov5/yolov5")
+sys.path.append("/deepsort-yolov5/yolov5/utils")
+print("sys_path", sys.path)
+
 
 def notebook_init(verbose=True):
     # Check system software and hardware

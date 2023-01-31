@@ -1,0 +1,8 @@
+services:
+  app:
+    build: .
+    ports:
+      - 8080:8080
+    working_dir: /deepsort-yolov5
+    volumes:
+      - ./:/deepsort-yolov5
